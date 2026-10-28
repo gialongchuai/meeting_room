@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: meeting-room-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-meeting_room}
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Vui lòng cấu hình mật khẩu database SPRING_DATASOURCE_PASSWORD trong file .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SPRING_DATASOURCE_USERNAME:-postgres} -d ${POSTGRES_DB:-meeting_room}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meeting-room-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-meeting_room}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Vui lòng cấu hình mật khẩu database SPRING_DATASOURCE_PASSWORD trong file .env}
+      JWT_SECRET: ${JWT_SECRET:?Vui lòng cấu hình khóa bí mật JWT_SECRET trong file .env (tối thiểu 32 byte)}
+      JWT_ACCESS_TTL_MINUTES: ${JWT_ACCESS_TTL_MINUTES:-30}
+      JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-7}
+      APP_ADMIN_EMAIL: ${APP_ADMIN_EMAIL:?Vui lòng cấu hình email quản trị APP_ADMIN_EMAIL trong file .env}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:?Vui lòng cấu hình mật khẩu quản trị APP_ADMIN_PASSWORD trong file .env (tối thiểu 8 ký tự gồm chữ và số)}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Ho_Chi_Minh}
+      APP_SEED_DEMO_DATA: ${APP_SEED_DEMO_DATA:-true}
+      BOOKING_MIN_DURATION_MINUTES: ${BOOKING_MIN_DURATION_MINUTES:-15}
+      BOOKING_MAX_DURATION_MINUTES: ${BOOKING_MAX_DURATION_MINUTES:-240}
+      BOOKING_TIME_SLOT_STEP_MINUTES: ${BOOKING_TIME_SLOT_STEP_MINUTES:-15}
+      BOOKING_MAX_LEAD_DAYS: ${BOOKING_MAX_LEAD_DAYS:-60}
+      BOOKING_WORKING_HOURS_START: ${BOOKING_WORKING_HOURS_START:-08:00}
+      BOOKING_WORKING_HOURS_END: ${BOOKING_WORKING_HOURS_END:-18:00}
+      BOOKING_QUOTA_PER_USER: ${BOOKING_QUOTA_PER_USER:-20}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
+    volumes:
+      - app_logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+volumes:
+  postgres_data:
+  app_logs:

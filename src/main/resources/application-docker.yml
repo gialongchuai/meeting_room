@@ -1,0 +1,13 @@
+spring:
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+
+app:
+  seed-demo-data: ${APP_SEED_DEMO_DATA:true}
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    com.company.roombooking: DEBUG
